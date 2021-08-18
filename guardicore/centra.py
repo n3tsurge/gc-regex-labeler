@@ -283,6 +283,24 @@ class CentraAPI(object):
         else:
             return None
 
+    def create_static_label(self, key, value, vms):
+        """
+        Creates a static label and adds assets to it
+        """
+
+        api_endpoint = f"/api/v3.0/assets/labels/{key}/{value}"
+
+        data = {
+            "vms": vms
+        }
+
+        response = self.session.post(f"{self.base_url}{api_endpoint}", data=json.dumps(data))
+        if response.status_code == 200:
+            return True
+        else:
+            print(response.status_code)
+            print(response.text)
+            return False
         
 
         

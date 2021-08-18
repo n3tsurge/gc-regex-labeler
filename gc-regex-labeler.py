@@ -65,6 +65,7 @@ if __name__ == "__main__":
         exit(1)
 
     # Fetch all the agents
+    logging.info("Fetching all assets from Guardicore Centra")
     assets = centra.list_assets(limit=100)
 
     # Create an empty dictionary to store all the labels that were processed
@@ -137,3 +138,13 @@ if __name__ == "__main__":
     if args.report:
         labels = {l: list(set(labels[l])) for l in labels}
         print(json.dumps({l: len(labels[l]) for l in labels}, indent=4))
+    else:
+        for l in labels:
+            key_value_pair = l.split(': ')
+            key = key_value_pair[0]
+            value = key_value_pair[1]
+            vms = labels[l]
+
+            success = centra.create_static_label(key, value, vms)
+            if success:
+                logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
