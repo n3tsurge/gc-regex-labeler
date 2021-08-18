@@ -36,7 +36,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('--config', help="The path to the configuration file", default="config.yml", required=False)
     parser.add_argument('--gc-management-url', help="Guardicore management URL", required=False)
-    parser.add_argument('--report', help="Report the results to a CSV", required=False)
+    parser.add_argument('--report', help="Report only mode, previews the labels that would be created and the number of assets within", action="store_true", required=False)
     parser.add_argument('-u', '--user', help="Guardicore username", required=False)
     parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
     args = parser.parse_args()
@@ -112,7 +112,8 @@ if __name__ == "__main__":
                             key = label
                             label_value = source_config['labels'][label]
 
-                            #logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
+                            if not args.report:
+                                logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
 
                             if f"{key}: {label_value}" in labels:
                                 labels[f"{key}: {label_value}"].append(asset['id'])
@@ -124,7 +125,8 @@ if __name__ == "__main__":
                 if 'label_source_field' in source_config and matched:
                     key = source_config['label_source_field']
 
-                    #logging.info(f"Labeling {asset['name']} with {key}: {value}")
+                    if not args.report:
+                        logging.info(f"Labeling {asset['name']} with {key}: {value}")
 
                     if f"{key}: {value}" in labels:
                         labels[f"{key}: {value}"].append(asset['id'])
@@ -132,5 +134,6 @@ if __name__ == "__main__":
                         labels[f"{key}: {value}"] = [asset['id']]
 
     # Dedupe the assets in each label
-    labels = {l: list(set(labels[l])) for l in labels}
-    print(json.dumps({l: len(labels[l]) for l in labels}, indent=4))
+    if args.report:
+        labels = {l: list(set(labels[l])) for l in labels}
+        print(json.dumps({l: len(labels[l]) for l in labels}, indent=4))
