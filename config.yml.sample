@@ -1,0 +1,62 @@
+guardicore:
+  management_url: "cus-NNNN.cloud.guardicore.com"
+  username: ""
+  password: ""
+
+rules:
+  workstations:
+    enabled: true
+    sources:
+      guest_agent_details.hostname:
+        pattern: "^\\d{2}\\w{6}\\-(L|A|V|T)\\d{5}"
+        labels:
+          Asset Type: Workstation
+
+  environment-production:
+    enabled: true
+    sources:
+      guest_agent_details.hostname:
+        pattern: '^\w{3}[L|W|A]P[V|P].*'
+        labels:
+          Environment: Production
+
+  environment-qa:
+    enabled: true
+    sources:
+      guest_agent_details.hostname:
+        pattern: '^\w{3}[L|W|A]Q[V|P].*'
+        labels:
+          Environment: QA
+
+  environment-test:
+    enabled: true
+    sources:
+      guest_agent_details.hostname:
+        pattern: '^\w{3}[L|W|A]T[V|P].*'
+        labels:
+          Environment: Test
+  
+  environment-dev:
+    enabled: true
+    sources:
+      guest_agent_details.hostname:
+        pattern: '^\w{3}[L|W|A]D[V|P].*'
+        labels:
+          Environment: Development
+
+  form-factor-physical:
+    enabled: true
+    sources:
+      guest_agent_details.hostname:
+        pattern: '^\w{3}[L|W|A][T|P|A|D]P.*'
+        labels:
+          Form Factor: Physical
+          
+  form-factor-virtual:
+    enabled: true
+    sources:
+      guest_agent_details.hostname:
+        pattern: '^\w{3}[L|W|A][T|P|A|D]V.*'
+        labels:
+          Form Factor: Virtual
+    
