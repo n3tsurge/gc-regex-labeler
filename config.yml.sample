@@ -2,6 +2,7 @@ guardicore:
   management_url: "cus-NNNN.cloud.guardicore.com"
   username: ""
   password: ""
+  report_only: false
 
 rules:
   workstations:

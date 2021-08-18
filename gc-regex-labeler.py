@@ -44,6 +44,9 @@ if __name__ == "__main__":
     # Load the configuration
     config = load_config(path=args.config)
 
+    if config['guardicore']['report_only']:
+        args.report = True
+
     if args.user:
         config['guardicore']['username'] = args.user
 
