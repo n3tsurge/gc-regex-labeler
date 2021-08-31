@@ -26,12 +26,19 @@ def get_nested(message, *args):
             value = message.get(element)
             return value if len(args) == 1 else get_nested(value, *args[1:])
 
+def match_all(pattern, target):
+    m = False
+    if isinstance(pattern, list):
+        m = any(re.match(p, target, re.IGNORECASE) for p in pattern)
+    else:
+        m = bool(re.match(pattern, target, re.IGNORECASE))
+    return m
 
 if __name__ == "__main__":
     # Set the logging format
     logging.basicConfig(
         format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
-    
+
     # Parse script parameters
     parser = ArgumentParser()
     parser.add_argument('--config', help="The path to the configuration file", default="config.yml", required=False)
@@ -85,7 +92,7 @@ if __name__ == "__main__":
         # Check each source field and apply labels based on the labels
         # defined for that source field
         for source in rule_config['sources']:
-            
+
             source_config = rule_config['sources'][source]
             source_field = source.split('.')
 
@@ -104,11 +111,9 @@ if __name__ == "__main__":
                     # check each value in the list
                     # or just address the value of the target field
                     if isinstance(value, list):
-                        
-                        for v in value:
-                            matches = re.match(pattern, v, re.IGNORECASE)
+                        matches = all(match_any(pattern, v) for v in value)
                     else:
-                        matches = re.match(pattern, value, re.IGNORECASE)
+                        matches = match_all(pattern, value)
 
                     if matches:
                         matched = True
@@ -124,7 +129,7 @@ if __name__ == "__main__":
                             else:
                                 labels[f"{key}: {label_value}"] = [asset['id']]
 
-                # Add the source field as a label to the asset only if 
+                # Add the source field as a label to the asset only if
                 # the regular patterns matched
                 if 'label_source_field' in source_config and matched:
                     key = source_config['label_source_field']
