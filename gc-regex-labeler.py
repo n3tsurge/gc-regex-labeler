@@ -27,13 +27,11 @@ def get_nested(message, *args):
             return value if len(args) == 1 else get_nested(value, *args[1:])
 
 def match_all(pattern, target):
-
     m = False
-    if target:
-        if isinstance(pattern, list):
-            m = any(re.match(p, target, re.IGNORECASE) for p in pattern)
-        else:
-            m = bool(re.match(pattern, target, re.IGNORECASE))
+    if isinstance(pattern, list):
+        m = any(re.match(p, target, re.IGNORECASE) for p in pattern)
+    else:
+        m = bool(re.match(pattern, target, re.IGNORECASE))
     return m
 
 if __name__ == "__main__":
@@ -78,7 +76,7 @@ if __name__ == "__main__":
 
     # Fetch all the agents
     logging.info("Fetching all assets from Guardicore Centra")
-    assets = centra.list_assets(limit=1000)
+    assets = centra.list_assets(limit=100)
 
     # Create an empty dictionary to store all the labels that were processed
     # to provide summary metrics at the end of the run
@@ -91,44 +89,58 @@ if __name__ == "__main__":
 
         rule_config = config['rules'][rule]
 
-        patterns = rule_config['patterns']
-        condition = rule_config['condition'] if 'condition' in rule_config else 'all'
+        # Check each source field and apply labels based on the labels
+        # defined for that source field
+        for source in rule_config['sources']:
 
-        for asset in assets:
-            matched = False
+            source_config = rule_config['sources'][source]
+            source_field = source.split('.')
 
-            if condition == "all":
-                matched = all(match_all(patterns[p], get_nested(asset, *p.split('.'))) for p in patterns)
-            if condition == "any":
-                matched = any(match_all(patterns[p], get_nested(asset, *p.split('.'))) for p in patterns)
+            for asset in assets:
+                pattern = rule_config['sources'][source]['pattern']
 
-            if matched:
+                # Determine if any of the patterns matched at any point
+                matched = False
 
-                if 'debug' in rule_config and rule_config['debug']:
-                    logging.info(f"Rule {rule} matched on {asset['name']}")
+                # Extract the value from a nested field in the assets dictionary
+                value = get_nested(asset, *source_field)
 
-                for key in rule_config['labels']:
-                    label_value = rule_config['labels'][key]
+                if value:
+
+                    # If the target field is a list
+                    # check each value in the list
+                    # or just address the value of the target field
+                    if isinstance(value, list):
+                        matches = all(match_any(pattern, v) for v in value)
+                    else:
+                        matches = match_all(pattern, value)
+
+                    if matches:
+                        matched = True
+                        for label in source_config['labels']:
+                            key = label
+                            label_value = source_config['labels'][label]
+
+                            if not args.report:
+                                logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
+
+                            if f"{key}: {label_value}" in labels:
+                                labels[f"{key}: {label_value}"].append(asset['id'])
+                            else:
+                                labels[f"{key}: {label_value}"] = [asset['id']]
+
+                # Add the source field as a label to the asset only if
+                # the regular patterns matched
+                if 'label_source_field' in source_config and matched:
+                    key = source_config['label_source_field']
 
                     if not args.report:
-                        logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
+                        logging.info(f"Labeling {asset['name']} with {key}: {value}")
 
-                    if f"{key}: {label_value}" in labels:
-                        labels[f"{key}: {label_value}"].append(asset['id'])
+                    if f"{key}: {value}" in labels:
+                        labels[f"{key}: {value}"].append(asset['id'])
                     else:
-                        labels[f"{key}: {label_value}"] = [asset['id']]
-
-                if 'source_field_labels' in rule_config:
-                    for key in rule_config['source_field_labels']:
-                        label_value = get_nested(asset, *rule_config['source_field_labels'][key].split('.'))
-
-                        if not args.report:
-                            logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
-                    
-                        if f"{key}: {label_value}" in labels:
-                            labels[f"{key}: {label_value}"].append(asset['id'])
-                        else:
-                            labels[f"{key}: {label_value}"] = [asset['id']]
+                        labels[f"{key}: {value}"] = [asset['id']]
 
     # Dedupe the assets in each label
     if args.report:
