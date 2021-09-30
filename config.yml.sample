@@ -5,59 +5,72 @@ guardicore:
   report_only: false
 
 rules:
-  workstations:
-    enabled: true
-    sources:
-      guest_agent_details.hostname:
-        pattern: "^\\d{2}\\w{6}\\-(L|A|V|T)\\d{5}"
-        labels:
-          Asset Type: Workstation
 
-  environment-production:
-    enabled: true
-    sources:
-      guest_agent_details.hostname:
-        pattern: '^\w{3}[L|W|A]P[V|P].*'
-        labels:
-          Environment: Production
+  domain-specific-workstations:
+    enabled: false
+    patterns:
+      guest_agent_details.hostname: 
+        - "^.*\\.example\\.com"
+      guest_agent_details.os_details.os_display_name: "^.*Windows [^(Server)].*$"
+    labels:
+      Asset Type: Workstation
+      Organization: Example
+    source_field_labels:
+      Operating System: guest_agent_details.os_details.os_display_name
 
-  environment-qa:
+  asset-type-servers:
     enabled: true
-    sources:
-      guest_agent_details.hostname:
-        pattern: '^\w{3}[L|W|A]Q[V|P].*'
-        labels:
-          Environment: QA
+    patterns:
+      guest_agent_details.os_details.os_display_name: "^.*Server.*$"
+    labels:
+      Asset Type: Server
+    source_field_labels:
+      Operating System: guest_agent_details.os_details.os_display_name
 
-  environment-test:
+  asset-type-workstations:
     enabled: true
-    sources:
-      guest_agent_details.hostname:
-        pattern: '^\w{3}[L|W|A]T[V|P].*'
-        labels:
-          Environment: Test
-  
-  environment-dev:
-    enabled: true
-    sources:
-      guest_agent_details.hostname:
-        pattern: '^\w{3}[L|W|A]D[V|P].*'
-        labels:
-          Environment: Development
+    patterns:
+      guest_agent_details.os_details.os_display_name: "^.*Windows [^(Server)].*$"
+    labels:
+      Asset Type: Workstation
+      Application: User Endpoints
+      Environment: Users
+    source_field_labels:
+      Operating System: guest_agent_details.os_details.os_display_name
 
-  form-factor-physical:
-    enabled: true
-    sources:
+  servers-production:
+    enabled: false
+    patterns:
       guest_agent_details.hostname:
-        pattern: '^\w{3}[L|W|A][T|P|A|D]P.*'
-        labels:
-          Form Factor: Physical
-          
-  form-factor-virtual:
-    enabled: true
-    sources:
+        - "^\\w{3}[L|W|A]P[V|P].*"
+      guest_agent_details.os_details.os_display_name: "^.*Server.*$"
+    labels:
+      Environment: Production    
+
+  servers-qa:
+    enabled: false
+    patterns:
       guest_agent_details.hostname:
-        pattern: '^\w{3}[L|W|A][T|P|A|D]V.*'
-        labels:
-          Form Factor: Virtual
+        - "^\\w{3}[L|W|A]Q[V|P].*"
+      guest_agent_details.os_details.os_display_name: "^.*Server.*$"
+    labels:
+      Environment: QA
+
+  servers-dev:
+    enabled: false
+    patterns:
+      guest_agent_details.hostname:
+        - "^\\w{3}[L|W|A]D[V|P].*"
+      guest_agent_details.os_details.os_display_name: "^.*Server.*$"
+    labels:
+      Environment: Development
+
+  servers-test:
+    enabled: false
+    patterns:
+      guest_agent_details.hostname:
+        - "^\\w{3}[L|W|A]T[V|P].*"
+      guest_agent_details.os_details.os_display_name: "^.*Server.*$"
+    labels:
+      Environment: Test
     
