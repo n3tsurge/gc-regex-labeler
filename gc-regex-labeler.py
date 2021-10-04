@@ -46,6 +46,7 @@ if __name__ == "__main__":
     parser.add_argument('--config', help="The path to the configuration file", default="config.yml", required=False)
     parser.add_argument('--gc-management-url', help="Guardicore management URL", required=False)
     parser.add_argument('--report', help="Report only mode, previews the labels that would be created and the number of assets within", action="store_true", required=False)
+    parser.add_argument('--rules', help="Shows all the rules in the system and exists", action="store_true", required=False)
     parser.add_argument('-u', '--user', help="Guardicore username", required=False)
     parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
     args = parser.parse_args()
@@ -64,6 +65,15 @@ if __name__ == "__main__":
 
     if args.gc_management_url:
         config['guardicore']['management_url'] = args.gc_management_url
+
+    if args.rules:
+        print("{:<30} {:<10} {:<10}".format("Name","Status","Labels"))
+        print("-"*55)
+        for rule in config['rules']:
+            rule_status = "Enabled" if config['rules'][rule]['enabled'] else "Disabled"
+            rule_labels = ", ".join(f"{key}: {config['rules'][rule]['labels'][key]}" for key in config['rules'][rule]['labels'])
+            print("{:<30} {:<10} {:<10}".format(rule, rule_status ,rule_labels))
+        exit(0)
 
     # Authenticate to Guardicore
     logging.info("Authenticating to Guardicore")
