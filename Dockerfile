@@ -12,4 +12,4 @@ RUN pip install --upgrade pip
 RUN pip install pipenv
 RUN pipenv install
 
-CMD ["pipenv", "run", "python", "gc-regex-labeler.py"]
+CMD ["pipenv", "run", "python", "gc-regex-labeler.py", "--service"]

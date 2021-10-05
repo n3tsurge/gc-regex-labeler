@@ -1,6 +1,7 @@
 import logging
 import re
 import json
+from time import sleep
 from getpass import getpass
 from pyaml_env import parse_config
 from argparse import ArgumentParser
@@ -47,6 +48,9 @@ if __name__ == "__main__":
     parser.add_argument('--gc-management-url', help="Guardicore management URL", required=False)
     parser.add_argument('--report', help="Report only mode, previews the labels that would be created and the number of assets within", action="store_true", required=False)
     parser.add_argument('--rules', help="Shows all the rules in the system and exists", action="store_true", required=False)
+    parser.add_argument('--service', help="Runs the Guardicore Regex Labeler in a loop with a wait interval", action="store_true", required=False)
+    parser.add_argument('--wait-interval', help="Wait interval between runs when running as a service", required=False, default=60)
+    parser.add_argument('--verbose-log', help="Turning this on will output verbose logs", required=False)
     parser.add_argument('-u', '--user', help="Guardicore username", required=False)
     parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
     args = parser.parse_args()
@@ -86,71 +90,86 @@ if __name__ == "__main__":
         logging.error(e)
         exit(1)
 
-    # Fetch all the agents
-    logging.info("Fetching all assets from Guardicore Centra")
-    assets = centra.list_assets(limit=1000)
-
-    # Create an empty dictionary to store all the labels that were processed
-    # to provide summary metrics at the end of the run
-    labels = {}
+    if 'wait_interval' in config['global'] and not args.wait_interval:
+        wait_interval = config['global']['wait_interval']
+    else:
+        wait_interval = args.wait_interval
 
     # Run each labeling rule
     active_rules = [r for r in config['rules'] if config['rules'][r]['enabled']]
-    for rule in active_rules:
-        logging.info(f"Running label rule {rule}")
+    while True:
 
-        rule_config = config['rules'][rule]
+        # Fetch all the agents
+        logging.info("Fetching all assets from Guardicore Centra")
+        assets = centra.list_assets(limit=1000)
 
-        patterns = rule_config['patterns']
-        condition = rule_config['condition'] if 'condition' in rule_config else 'all'
+        # Create an empty dictionary to store all the labels that were processed
+        # to provide summary metrics at the end of the run
+        labels = {}
 
-        for asset in assets:
-            matched = False
+        for rule in active_rules:
+            logging.info(f"Running label rule {rule}")
 
-            if condition == "all":
-                matched = all(match_all(patterns[p], get_nested(asset, *p.split('.'))) for p in patterns)
-            if condition == "any":
-                matched = any(match_all(patterns[p], get_nested(asset, *p.split('.'))) for p in patterns)
+            rule_config = config['rules'][rule]
 
-            if matched:
+            patterns = rule_config['patterns']
+            condition = rule_config['condition'] if 'condition' in rule_config else 'all'
 
-                if 'debug' in rule_config and rule_config['debug']:
-                    logging.info(f"Rule {rule} matched on {asset['name']}")
+            for asset in assets:
+                matched = False
 
-                for key in rule_config['labels']:
-                    label_value = rule_config['labels'][key]
+                if condition == "all":
+                    matched = all(match_all(patterns[p], get_nested(asset, *p.split('.'))) for p in patterns)
+                if condition == "any":
+                    matched = any(match_all(patterns[p], get_nested(asset, *p.split('.'))) for p in patterns)
 
-                    if not args.report:
-                        logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
+                if matched:
 
-                    if f"{key}: {label_value}" in labels:
-                        labels[f"{key}: {label_value}"].append(asset['id'])
-                    else:
-                        labels[f"{key}: {label_value}"] = [asset['id']]
+                    if 'debug' in rule_config and rule_config['debug']:
+                        logging.info(f"Rule {rule} matched on {asset['name']}")
 
-                if 'source_field_labels' in rule_config:
-                    for key in rule_config['source_field_labels']:
-                        label_value = get_nested(asset, *rule_config['source_field_labels'][key].split('.'))
+                    for key in rule_config['labels']:
+                        label_value = rule_config['labels'][key]
 
-                        if not args.report:
+                        if not args.report and args.verbose_log:
                             logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
-                    
+
                         if f"{key}: {label_value}" in labels:
                             labels[f"{key}: {label_value}"].append(asset['id'])
                         else:
                             labels[f"{key}: {label_value}"] = [asset['id']]
 
-    # Dedupe the assets in each label
-    if args.report:
-        labels = {l: list(set(labels[l])) for l in labels}
-        print(json.dumps({l: len(labels[l]) for l in labels}, indent=4))
-    else:
-        for l in labels:
-            key_value_pair = l.split(': ')
-            key = key_value_pair[0]
-            value = key_value_pair[1]
-            vms = labels[l]
+                    if 'source_field_labels' in rule_config:
+                        for key in rule_config['source_field_labels']:
+                            label_value = get_nested(asset, *rule_config['source_field_labels'][key].split('.'))
 
-            success = centra.create_static_label(key, value, vms)
-            if success:
-                logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
+                            if not args.report and args.verbose_log:
+                                logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
+                        
+                            if f"{key}: {label_value}" in labels:
+                                labels[f"{key}: {label_value}"].append(asset['id'])
+                            else:
+                                labels[f"{key}: {label_value}"] = [asset['id']]
+
+        # Dedupe the assets in each label
+        if args.report:
+            labels = {l: list(set(labels[l])) for l in labels}
+            print(json.dumps({l: len(labels[l]) for l in labels}, indent=4))
+        else:
+            for l in labels:
+                key_value_pair = l.split(': ')
+                key = key_value_pair[0]
+                value = key_value_pair[1]
+                vms = labels[l]
+
+                success = centra.create_static_label(key, value, vms)
+                if success:
+                    logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
+
+        # If this is a single run, break out of the loop
+        if not args.service:
+            break
+        else:
+            logging.info(f"Sleeping for {wait_interval} seconds.")
+            sleep(wait_interval)
+        

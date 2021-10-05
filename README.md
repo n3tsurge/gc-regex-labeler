@@ -4,11 +4,10 @@ Labels assets based on Regular expressions using the Centra API
 
 ## Future Features
 
-- [ ] Continuous labeling
-  - Each label rule will have it's own query interval
-- [ ] Support for labeling based on values in lists (e.g. using the MAC address of a machine)
-- [ ] Mutli-criteria rules (must match pattern A and pattern B to get label K:V)
-- [ ] Dockerized version for continuous labeling
+- [x] Continuous labeling
+- [x] Support for labeling based on values in lists (e.g. using the MAC address of a machine)
+- [x] Multi-field criteria rules (must match expression across all fields to label)
+- [x] Dockerized version for continuous labeling
 - [ ] Hot reload of the config.yml file to load new rules without relaunching the container/script
 
 
