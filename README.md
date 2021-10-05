@@ -22,7 +22,9 @@ Labels assets based on Regular expressions using the Centra API
 $ pipenv run python .\gc-regex-labeler.py -h
 usage: gc-regex-labeler.py [-h] [--config CONFIG]
                            [--gc-management-url GC_MANAGEMENT_URL] [--report]
-                           [-u USER] [-p]
+                           [--rules] [--service]
+                           [--wait-interval WAIT_INTERVAL]
+                           [--verbose-log VERBOSE_LOG] [-u USER] [-p]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -31,6 +33,13 @@ optional arguments:
                         Guardicore management URL
   --report              Report only mode, previews the labels that would be
                         created and the number of assets within
+  --rules               Shows all the rules in the system and exists
+  --service             Runs the Guardicore Regex Labeler in a loop with a
+                        wait interval
+  --wait-interval WAIT_INTERVAL
+                        Wait interval between runs when running as a service
+  --verbose-log VERBOSE_LOG
+                        Turning this on will output verbose logs
   -u USER, --user USER  Guardicore username
   -p, --password        Prompt for the Guardicore password
 ```
