@@ -47,12 +47,13 @@ if __name__ == "__main__":
     parser.add_argument('--config', help="The path to the configuration file", default="config.yml", required=False)
     parser.add_argument('--gc-management-url', help="Guardicore management URL", required=False)
     parser.add_argument('--report', help="Report only mode, previews the labels that would be created and the number of assets within", action="store_true", required=False)
-    parser.add_argument('--rules', help="Shows all the rules in the system and exists", action="store_true", required=False)
+    parser.add_argument('--rules', help="Shows all the rules in the system and exits", action="store_true", required=False)
     parser.add_argument('--service', help="Runs the Guardicore Regex Labeler in a loop with a wait interval", action="store_true", required=False)
-    parser.add_argument('--wait-interval', help="Wait interval between runs when running as a service", required=False, default=60)
+    parser.add_argument('--wait-interval', help="Wait interval between runs when running as a service", required=False, default=60, type=int)
     parser.add_argument('--verbose-log', help="Turning this on will output verbose logs", required=False)
     parser.add_argument('-u', '--user', help="Guardicore username", required=False)
     parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
+    parser.add_argument('--check-dupes', help="Prints out all the assets that have multiple values for a key", action="store_true")
     args = parser.parse_args()
 
     # Load the configuration
@@ -91,9 +92,31 @@ if __name__ == "__main__":
         exit(1)
 
     if 'wait_interval' in config['global'] and not args.wait_interval:
-        wait_interval = config['global']['wait_interval']
+        wait_interval = int(config['global']['wait_interval'])
     else:
         wait_interval = args.wait_interval
+
+    if args.check_dupes:
+        logging.info("Fetching all assets from Guardicore Centra")
+        assets = centra.list_assets(limit=1000)
+        for asset in assets:
+            label_stats = {}
+            bad_keys = []
+            for label in asset['labels']:
+                key = label['key']
+                if key in label_stats:
+                    label_stats[key] += 1
+                else:
+                    label_stats[key] = 1
+            
+            for key in label_stats:
+                if label_stats[key] > 1:
+                    bad_keys.append(key)
+            
+            if len(bad_keys) > 0:
+                logging.warning(f"{asset['name']} has multiple labels for {bad_keys}")
+        
+        exit(1)
 
     # Run each labeling rule
     active_rules = [r for r in config['rules'] if config['rules'][r]['enabled']]
