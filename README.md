@@ -33,7 +33,7 @@ optional arguments:
                         Guardicore management URL
   --report              Report only mode, previews the labels that would be
                         created and the number of assets within
-  --rules               Shows all the rules in the system and exists
+  --rules               Shows all the rules in the system and exits
   --service             Runs the Guardicore Regex Labeler in a loop with a
                         wait interval
   --wait-interval WAIT_INTERVAL

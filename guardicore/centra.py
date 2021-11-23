@@ -43,7 +43,7 @@ class CentraAPI(object):
             })
 
         if response.status_code == 401:
-            raise ValueErro("Incorrect Guardicore username or password.")
+            raise ValueError("Incorrect Guardicore username or password.")
     
     def block_ip(self, ip, rule_set, direction):
         """
@@ -267,6 +267,9 @@ class CentraAPI(object):
         
         api_endpoint = f"/api/v3.0/assets?limit={limit}&offset={offset}"
 
+        if 'status' in kwargs:
+            api_endpoint += f"&status={kwargs['status']}"
+
         # Create an empty set of results
         results = []
 
@@ -298,8 +301,11 @@ class CentraAPI(object):
         if response.status_code == 200:
             return True
         else:
-            print(response.status_code)
-            print(response.text)
+            print(f"Endpoint: {api_endpoint}")
+            print(f"Response Code: {response.status_code}")
+            print(f"Response Text: {response.text}")
+            print(f"Key: {key}, Value: {value}")
+            print(json.dumps(data, indent=4))
             return False
         
 
