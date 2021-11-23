@@ -101,17 +101,17 @@ if __name__ == "__main__":
         assets = centra.list_assets(limit=1000)
         for asset in assets:
             label_stats = {}
-            bad_keys = []
+            bad_keys = {}
             for label in asset['labels']:
                 key = label['key']
                 if key in label_stats:
-                    label_stats[key] += 1
+                    label_stats[key].append(label['value'])
                 else:
-                    label_stats[key] = 1
+                    label_stats[key] = [label['value']]
             
             for key in label_stats:
-                if label_stats[key] > 1:
-                    bad_keys.append(key)
+                if len(label_stats[key]) > 1:
+                    bad_keys[key] = label_stats[key]
             
             if len(bad_keys) > 0:
                 logging.warning(f"{asset['name']} has multiple labels for {bad_keys}")
@@ -122,9 +122,12 @@ if __name__ == "__main__":
     active_rules = [r for r in config['rules'] if config['rules'][r]['enabled']]
     while True:
 
+        ID_FIELD = 'id'
+
         # Fetch all the agents
         logging.info("Fetching all assets from Guardicore Centra")
-        assets = centra.list_assets(limit=1000)
+
+        assets = centra.list_assets(limit=1000, status="on")
 
         # Create an empty dictionary to store all the labels that were processed
         # to provide summary metrics at the end of the run
@@ -158,9 +161,9 @@ if __name__ == "__main__":
                             logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
 
                         if f"{key}: {label_value}" in labels:
-                            labels[f"{key}: {label_value}"].append(asset['id'])
+                            labels[f"{key}: {label_value}"].append(asset[ID_FIELD])
                         else:
-                            labels[f"{key}: {label_value}"] = [asset['id']]
+                            labels[f"{key}: {label_value}"] = [asset[ID_FIELD]]
 
                     if 'source_field_labels' in rule_config:
                         for key in rule_config['source_field_labels']:
@@ -170,9 +173,9 @@ if __name__ == "__main__":
                                 logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
                         
                             if f"{key}: {label_value}" in labels:
-                                labels[f"{key}: {label_value}"].append(asset['id'])
+                                labels[f"{key}: {label_value}"].append(asset[ID_FIELD])
                             else:
-                                labels[f"{key}: {label_value}"] = [asset['id']]
+                                labels[f"{key}: {label_value}"] = [asset[ID_FIELD]]
 
         # Dedupe the assets in each label
         if args.report:
@@ -183,7 +186,8 @@ if __name__ == "__main__":
                 key_value_pair = l.split(': ')
                 key = key_value_pair[0]
                 value = key_value_pair[1]
-                vms = labels[l]
+                #vms = labels[l] 
+                vms = list(set(labels[l]))
 
                 success = centra.create_static_label(key, value, vms)
                 if success:
