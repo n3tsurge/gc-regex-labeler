@@ -1,6 +1,8 @@
 import logging
 import re
 import json
+import threading
+from queue import Queue
 from time import sleep
 from getpass import getpass
 from pyaml_env import parse_config
@@ -37,6 +39,19 @@ def match_all(pattern, target):
             m = bool(re.match(pattern, target, re.IGNORECASE))
     return m
 
+
+def process_label(label_queue, centra):
+    while not label_queue.empty():
+        label_data = label_queue.get()
+        key = label_data['key']
+        value = label_data['value']
+        vms = label_data['vms']
+        success = centra.create_static_label(key, value, vms)
+        if success:
+            logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
+        else:
+            logging.error(f"Failed to label {len(vms)} assets with {key}: {value}")
+
 if __name__ == "__main__":
     # Set the logging format
     logging.basicConfig(
@@ -49,7 +64,7 @@ if __name__ == "__main__":
     parser.add_argument('--report', help="Report only mode, previews the labels that would be created and the number of assets within", action="store_true", required=False)
     parser.add_argument('--rules', help="Shows all the rules in the system and exits", action="store_true", required=False)
     parser.add_argument('--service', help="Runs the Guardicore Regex Labeler in a loop with a wait interval", action="store_true", required=False)
-    parser.add_argument('--wait-interval', help="Wait interval between runs when running as a service", required=False, default=60, type=int)
+    parser.add_argument('--wait-interval', help="Wait interval between runs when running as a service", required=False, type=int)
     parser.add_argument('--verbose-log', help="Turning this on will output verbose logs", required=False)
     parser.add_argument('-u', '--user', help="Guardicore username", required=False)
     parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
@@ -182,16 +197,27 @@ if __name__ == "__main__":
             labels = {l: list(set(labels[l])) for l in labels}
             print(json.dumps({l: len(labels[l]) for l in labels}, indent=4))
         else:
+            label_queue = Queue()
+
             for l in labels:
                 key_value_pair = l.split(': ')
                 key = key_value_pair[0]
                 value = key_value_pair[1]
                 #vms = labels[l] 
                 vms = list(set(labels[l]))
+                label_queue.put({'key': key, 'value': value, 'vms': vms})
 
-                success = centra.create_static_label(key, value, vms)
-                if success:
-                    logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
+            workers = []
+            for i in range(0, 5):
+                p = threading.Thread(target=process_label, daemon=True, args=(label_queue, centra))
+                workers.append(p)
+
+            [w.start() for w in workers]
+            [w.join() for w in workers]
+
+                #success = centra.create_static_label(key, value, vms)
+                #if success:
+                #    logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
 
         # If this is a single run, break out of the loop
         if not args.service:

@@ -305,7 +305,7 @@ class CentraAPI(object):
             print(f"Response Code: {response.status_code}")
             print(f"Response Text: {response.text}")
             print(f"Key: {key}, Value: {value}")
-            print(json.dumps(data, indent=4))
+            #print(json.dumps(data, indent=4))
             return False
         
 
