@@ -69,6 +69,8 @@ if __name__ == "__main__":
     parser.add_argument('-u', '--user', help="Guardicore username", required=False)
     parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
     parser.add_argument('--check-dupes', help="Prints out all the assets that have multiple values for a key", action="store_true")
+    parser.add_argument('--check-missing', help="Identify assets missing a label for a certain key or list of keys", nargs="+")
+    parser.add_argument('--skip-deleted', help="Do not return deleted assets", action="store_true")
     args = parser.parse_args()
 
     # Load the configuration
@@ -131,6 +133,24 @@ if __name__ == "__main__":
             if len(bad_keys) > 0:
                 logging.warning(f"{asset['name']} has multiple labels for {bad_keys}")
         
+        exit(1)
+
+    if len(args.check_missing) > 0:
+        logging.info("Fetching all assets from Guardicore Centra")
+        if args.skip_deleted:
+            logging.info("Skipping assets that are off/deleted")
+            assets = centra.list_assets(limit=1000, status="on")
+        else:
+            assets = centra.list_assets(limit=1000, status="on")
+        for asset in assets:
+            bad_keys = []
+            for key in args.check_missing:
+                if not any(l for l in asset['labels'] if key == l['key']):
+                    bad_keys.append(key)
+
+            if len(bad_keys) > 0:
+                print(f"{asset['name']} is missing the following label keys {bad_keys}")
+
         exit(1)
 
     # Run each labeling rule
