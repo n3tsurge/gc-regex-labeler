@@ -1,5 +1,6 @@
 import logging
 import re
+import csv
 import json
 import threading
 from queue import Queue
@@ -71,6 +72,9 @@ if __name__ == "__main__":
     parser.add_argument('--check-dupes', help="Prints out all the assets that have multiple values for a key", action="store_true")
     parser.add_argument('--check-missing', help="Identify assets missing a label for a certain key or list of keys", nargs="+")
     parser.add_argument('--skip-deleted', help="Do not return deleted assets", action="store_true")
+    parser.add_argument('--export-csv', help="Export the data to a csv", action="store_true")
+    parser.add_argument('--csv-label-keys', help="Which label keys to export", nargs="+")
+    parser.add_argument('--csv-file-name', help="The path where to save the CSV file")
     args = parser.parse_args()
 
     # Load the configuration
@@ -135,13 +139,13 @@ if __name__ == "__main__":
         
         exit(1)
 
-    if len(args.check_missing) > 0:
+    if args.check_missing:
         logging.info("Fetching all assets from Guardicore Centra")
         if args.skip_deleted:
             logging.info("Skipping assets that are off/deleted")
             assets = centra.list_assets(limit=1000, status="on")
         else:
-            assets = centra.list_assets(limit=1000, status="on")
+            assets = centra.list_assets(limit=1000)
         for asset in assets:
             bad_keys = []
             for key in args.check_missing:
@@ -153,6 +157,61 @@ if __name__ == "__main__":
 
         exit(1)
 
+    if args.export_csv:
+
+        if not args.csv_file_name:
+            logging.error('The --csv-file-name parameter is required.')
+            exit(1)
+
+        logging.info('Fetching all assets from Guardicore Centra')
+
+        if args.skip_deleted:
+            logging.info("Skipping assets that are off/deleted")
+            assets = centra.list_assets(limit=1000, status="on")
+        else:
+            assets = centra.list_assets(limit=1000)
+
+        csv_headers = ['asset_name','status'] + args.csv_label_keys
+        rows = []
+
+        for asset in assets:
+            row = {
+                'asset_name': asset['name'],
+                'status': asset['status']
+            }
+            for key in args.csv_label_keys:
+                
+                # If the asset has the label
+                if any(l for l in asset['labels'] if key == l['key']):
+
+                    # Find all the labels for this key
+                    for label in asset['labels']:
+                        if label['key'] == key:
+
+                            # If the label has already been added and is duplicate append the dupe
+                            # else add the new value
+                            if key in row and isinstance(row[key], list):
+                                row[key].append(label['value'])
+                            else:                        
+                                row[key] = [label['value']]
+
+                else:
+                    row[key] = ''
+
+            # Merge and flatten all list fields
+            for key in args.csv_label_keys:
+                row[key] = '\n'.join(row[key])
+            rows.append(row)
+
+        with open(args.csv_file_name, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=csv_headers)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+
+        exit(0)
+        
+        
     # Run each labeling rule
     active_rules = [r for r in config['rules'] if config['rules'][r]['enabled']]
     while True:
