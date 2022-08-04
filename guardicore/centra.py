@@ -18,6 +18,7 @@ class CentraAPI(object):
         self.session.headers.update({
             'Content-Type': 'application/json'
         })
+        #self.session.verify = False
 
     def authenticate(self, username, password):
         """
