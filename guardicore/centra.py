@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 class CentraAPI(object):
 
-    def __init__(self, management_url="", http_scheme="https"):
+    def __init__(self, management_url="", http_scheme="https", verify_tls=True):
         """
         Initializes an API object that is used
         to make consistent calls to the Guardicore Centra API
@@ -18,7 +18,7 @@ class CentraAPI(object):
         self.session.headers.update({
             'Content-Type': 'application/json'
         })
-        #self.session.verify = False
+        self.session.verify = verify_tls
 
     def authenticate(self, username, password):
         """

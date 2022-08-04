@@ -162,7 +162,7 @@ if __name__ == "__main__":
 
     # Authenticate to Guardicore
     logging.info("Authenticating to Guardicore")
-    centra = CentraAPI(management_url=config['guardicore']['management_url'])
+    centra = CentraAPI(management_url=config['guardicore']['management_url'], verify_tls=config['guardicore']['verify_tls'])
 
     try:
         centra.authenticate(
@@ -238,6 +238,7 @@ if __name__ == "__main__":
                 'asset_name': asset['name'],
                 'status': asset['status']
             }
+            missing_label = False
             for key in args.csv_label_keys:
                 
                 # If the asset has the label
@@ -256,11 +257,13 @@ if __name__ == "__main__":
 
                 else:
                     row[key] = ''
+                    missing_label = True
 
             # Merge and flatten all list fields
             for key in args.csv_label_keys:
                 row[key] = '\n'.join(row[key])
-            rows.append(row)
+            if missing_label:
+                rows.append(row)
 
         with open(args.csv_file_name, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=csv_headers)
