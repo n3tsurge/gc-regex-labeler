@@ -108,6 +108,7 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
     parser.add_argument('--check-dupes', help="Prints out all the assets that have multiple values for a key", action="store_true")
     parser.add_argument('--check-missing', help="Identify assets missing a label for a certain key or list of keys", nargs="+")
+    parser.add_argument('--csv-missing-only', help="When exporting a CSV report only the assets with missing labels will be output", action="store_true")
     parser.add_argument('--label-missing', help="Will label assets missing labels with the --check-missing flag with a label Labels Missing: Yes", action="store_true")
     parser.add_argument('--skip-deleted', help="Do not return deleted assets", action="store_true")
     parser.add_argument('--export-csv', help="Export the data to a csv", action="store_true")
@@ -263,7 +264,7 @@ if __name__ == "__main__":
             for key in args.csv_label_keys:
                 row[key] = '\n'.join(row[key])
 
-            if missing_label and args.check_missing:
+            if missing_label and args.csv_missing_only:
                 rows.append(row)
             else:
                 rows.append(row)
