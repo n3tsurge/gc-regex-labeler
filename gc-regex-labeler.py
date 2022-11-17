@@ -102,7 +102,7 @@ if __name__ == "__main__":
     parser.add_argument('--report', help="Report only mode, previews the labels that would be created and the number of assets within", action="store_true", required=False)
     parser.add_argument('--rules', help="Shows all the rules in the system and exits", action="store_true", required=False)
     parser.add_argument('--service', help="Runs the Guardicore Regex Labeler in a loop with a wait interval", action="store_true", required=False)
-    parser.add_argument('--wait-interval', help="Wait interval between runs when running as a service", required=False, type=int)
+    parser.add_argument('--wait-interval', help="Wait interval (seconds) between runs when running as a service", required=False, type=int)
     parser.add_argument('--verbose-log', help="Turning this on will output verbose logs", required=False)
     parser.add_argument('-u', '--user', help="Guardicore username", required=False)
     parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
@@ -262,8 +262,12 @@ if __name__ == "__main__":
             # Merge and flatten all list fields
             for key in args.csv_label_keys:
                 row[key] = '\n'.join(row[key])
-            if missing_label:
+
+            if missing_label and args.check_missing:
                 rows.append(row)
+            else:
+                rows.append(row)
+                
 
         with open(args.csv_file_name, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=csv_headers)
