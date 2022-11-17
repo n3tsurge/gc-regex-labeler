@@ -1,20 +1,25 @@
-import logging
-import re
 import csv
 import json
-import threading
+import logging
+import re
 import smtplib
-from os.path import basename
+import threading
+from argparse import ArgumentParser
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import COMMASPACE, formatdate
+from getpass import getpass
+from os.path import basename
 from queue import Queue
 from time import sleep
-from getpass import getpass
+
+import urllib3
 from pyaml_env import parse_config
-from argparse import ArgumentParser
+
 from guardicore.centra import CentraAPI
+
+urllib3.disable_warnings()
 
 
 def send_email(send_from, send_to, subject, body, files=[], server="127.0.0.1", as_html=False):
@@ -66,6 +71,7 @@ def get_nested(message, *args):
             value = message.get(element)
             return value if len(args) == 1 else get_nested(value, *args[1:])
 
+
 def match_all(pattern, target):
 
     m = False
@@ -87,7 +93,8 @@ def process_label(label_queue, centra):
         if success:
             logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
         else:
-            logging.error(f"Failed to label {len(vms)} assets with {key}: {value}")
+            logging.error(
+                f"Failed to label {len(vms)} assets with {key}: {value}")
 
 
 if __name__ == "__main__":
@@ -97,29 +104,51 @@ if __name__ == "__main__":
 
     # Parse script parameters
     parser = ArgumentParser()
-    parser.add_argument('--config', help="The path to the configuration file", default="config.yml", required=False)
-    parser.add_argument('--gc-management-url', help="Guardicore management URL", required=False)
-    parser.add_argument('--report', help="Report only mode, previews the labels that would be created and the number of assets within", action="store_true", required=False)
-    parser.add_argument('--rules', help="Shows all the rules in the system and exits", action="store_true", required=False)
-    parser.add_argument('--service', help="Runs the Guardicore Regex Labeler in a loop with a wait interval", action="store_true", required=False)
-    parser.add_argument('--wait-interval', help="Wait interval (seconds) between runs when running as a service", required=False, type=int)
-    parser.add_argument('--verbose-log', help="Turning this on will output verbose logs", required=False)
-    parser.add_argument('-u', '--user', help="Guardicore username", required=False)
-    parser.add_argument('-p', '--password', help="Prompt for the Guardicore password", required=False, action="store_true")
-    parser.add_argument('--check-dupes', help="Prints out all the assets that have multiple values for a key", action="store_true")
-    parser.add_argument('--check-missing', help="Identify assets missing a label for a certain key or list of keys", nargs="+")
-    parser.add_argument('--csv-missing-only', help="When exporting a CSV report only the assets with missing labels will be output", action="store_true")
-    parser.add_argument('--label-missing', help="Will label assets missing labels with the --check-missing flag with a label Labels Missing: Yes", action="store_true")
-    parser.add_argument('--skip-deleted', help="Do not return deleted assets", action="store_true")
-    parser.add_argument('--export-csv', help="Export the data to a csv", action="store_true")
-    parser.add_argument('--csv-label-keys', help="Which label keys to export", nargs="+")
-    parser.add_argument('--csv-file-name', help="The path where to save the CSV file")
-    parser.add_argument('--email-report', help="Whether to e-mail the exported CSV", action="store_true")
-    parser.add_argument('--email-to', help="Who to send the exported CSV to", nargs="+")
-    parser.add_argument('--email-subject', help="The subject of the email for sending the CSV")
-    parser.add_argument('--email-from', help="From addresss for sending email reports")
+    parser.add_argument('--config', help="The path to the configuration file",
+                        default="config.yml", required=False)
+    parser.add_argument('--gc-management-url',
+                        help="Guardicore management URL", required=False)
+    parser.add_argument('--report', help="Report only mode, previews the labels that would be created and the number of assets within",
+                        action="store_true", required=False)
+    parser.add_argument('--rules', help="Shows all the rules in the system and exits",
+                        action="store_true", required=False)
+    parser.add_argument('--service', help="Runs the Guardicore Regex Labeler in a loop with a wait interval",
+                        action="store_true", required=False)
+    parser.add_argument(
+        '--wait-interval', help="Wait interval (seconds) between runs when running as a service", required=False, type=int)
+    parser.add_argument(
+        '--verbose-log', help="Turning this on will output verbose logs", required=False)
+    parser.add_argument(
+        '-u', '--user', help="Guardicore username", required=False)
+    parser.add_argument('-p', '--password', help="Prompt for the Guardicore password",
+                        required=False, action="store_true")
+    parser.add_argument(
+        '--check-dupes', help="Prints out all the assets that have multiple values for a key", action="store_true")
+    parser.add_argument(
+        '--check-missing', help="Identify assets missing a label for a certain key or list of keys", nargs="+")
+    parser.add_argument(
+        '--csv-missing-only', help="When exporting a CSV report only the assets with missing labels will be output", action="store_true")
+    parser.add_argument(
+        '--label-missing', help="Will label assets missing labels with the --check-missing flag with a label Labels Missing: Yes", action="store_true")
+    parser.add_argument(
+        '--skip-deleted', help="Do not return deleted assets", action="store_true")
+    parser.add_argument(
+        '--export-csv', help="Export the data to a csv", action="store_true")
+    parser.add_argument('--csv-label-keys',
+                        help="Which label keys to export", nargs="+")
+    parser.add_argument('--csv-file-name',
+                        help="The path where to save the CSV file")
+    parser.add_argument(
+        '--email-report', help="Whether to e-mail the exported CSV", action="store_true")
+    parser.add_argument(
+        '--email-to', help="Who to send the exported CSV to", nargs="+")
+    parser.add_argument('--email-subject',
+                        help="The subject of the email for sending the CSV")
+    parser.add_argument(
+        '--email-from', help="From addresss for sending email reports")
     parser.add_argument('--smtp-server', help="The SMTP server to use")
-    parser.add_argument('--ignore-tls', help="Ignores TLS issues when calling the API")
+    parser.add_argument(
+        '--ignore-tls', help="Ignores TLS issues when calling the API")
     args = parser.parse_args()
 
     # Load the configuration
@@ -153,17 +182,23 @@ if __name__ == "__main__":
         config['global']['smtp_server'] = args.smtp_server
 
     if args.rules:
-        print("{:<30} {:<10} {:<10}".format("Name","Status","Labels"))
+        print("{:<30} {:<10} {:<10}".format("Name", "Status", "Labels"))
         print("-"*55)
         for rule in config['rules']:
             rule_status = "Enabled" if config['rules'][rule]['enabled'] else "Disabled"
-            rule_labels = ", ".join(f"{key}: {config['rules'][rule]['labels'][key]}" for key in config['rules'][rule]['labels'])
-            print("{:<30} {:<10} {:<10}".format(rule, rule_status ,rule_labels))
+            rule_labels = ", ".join(
+                f"{key}: {config['rules'][rule]['labels'][key]}" for key in config['rules'][rule]['labels'])
+            print("{:<30} {:<10} {:<10}".format(
+                rule, rule_status, rule_labels))
         exit(0)
+
+    if args.csv_missing_only:
+        logging.warning("Resulting CSV will only contain assets missing label values due to --csv-missing-only")
 
     # Authenticate to Guardicore
     logging.info("Authenticating to Guardicore")
-    centra = CentraAPI(management_url=config['guardicore']['management_url'], verify_tls=config['guardicore']['verify_tls'])
+    centra = CentraAPI(
+        management_url=config['guardicore']['management_url'], verify_tls=config['guardicore']['verify_tls'])
 
     try:
         centra.authenticate(
@@ -189,14 +224,15 @@ if __name__ == "__main__":
                     label_stats[key].append(label['value'])
                 else:
                     label_stats[key] = [label['value']]
-            
+
             for key in label_stats:
                 if len(label_stats[key]) > 1:
                     bad_keys[key] = label_stats[key]
-            
+
             if len(bad_keys) > 0:
-                logging.warning(f"{asset['name']} has multiple labels for {bad_keys}")
-        
+                logging.warning(
+                    f"{asset['name']} has multiple labels for {bad_keys}")
+
         exit(1)
 
     if args.check_missing:
@@ -213,7 +249,8 @@ if __name__ == "__main__":
                     bad_keys.append(key)
 
             if len(bad_keys) > 0:
-                print(f"{asset['name']} is missing the following label keys {bad_keys}")
+                print(
+                    f"{asset['name']} is missing the following label keys {bad_keys}")
 
         exit(1)
 
@@ -231,7 +268,7 @@ if __name__ == "__main__":
         else:
             assets = centra.list_assets(limit=1000)
 
-        csv_headers = ['asset_name','status'] + args.csv_label_keys
+        csv_headers = ['asset_name', 'status'] + args.csv_label_keys
         rows = []
 
         for asset in assets:
@@ -241,7 +278,7 @@ if __name__ == "__main__":
             }
             missing_label = False
             for key in args.csv_label_keys:
-                
+
                 # If the asset has the label
                 if any(l for l in asset['labels'] if key == l['key']):
 
@@ -253,7 +290,7 @@ if __name__ == "__main__":
                             # else add the new value
                             if key in row and isinstance(row[key], list):
                                 row[key].append(label['value'])
-                            else:                        
+                            else:
                                 row[key] = [label['value']]
 
                 else:
@@ -264,25 +301,25 @@ if __name__ == "__main__":
             for key in args.csv_label_keys:
                 row[key] = '\n'.join(row[key])
 
-            if missing_label and args.csv_missing_only:
-                rows.append(row)
+            if args.csv_missing_only:
+                if missing_label:
+                    rows.append(row)
             else:
                 rows.append(row)
-                
 
         with open(args.csv_file_name, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=csv_headers)
             writer.writeheader()
             for row in rows:
                 writer.writerow(row)
-        
-        if config['global']['email_report']:
+
+        if config['global']['email_report'] == 42:
 
             body = f"""<html><head></head><body><h1>Assets Missing Key Labels Report</h1><p><i>This report was automatically generated by the Guardicore Regex Labeling Tool.</i><br><br><b>IMPORTANT</b>: Assets missing these labels may not get proper policy and may be at an elevated exposure level or may be incorrectly blocking traffic.<br><br>The report contains assets missing one of the following labels: <ul>"""
             for key in args.csv_label_keys:
                 body += f"<li>{key}</li>"
 
-            body += """</ul></p><h2>How to read this report</h2><p>The best method for reading this report is to filter on <b>status</b> on, then filter for any of the label keys where the key is blank.  Label keys will be represented as columns in the CSV</p></body></html>""" 
+            body += """</ul></p><h2>How to read this report</h2><p>The best method for reading this report is to filter on <b>status</b> on, then filter for any of the label keys where the key is blank.  Label keys will be represented as columns in the CSV</p></body></html>"""
 
             send_email(send_from=config['global']['email_from'],
                        send_to=config['global']['email_to'],
@@ -293,10 +330,10 @@ if __name__ == "__main__":
                        as_html=config['global']['email_as_html'])
 
         exit(0)
-        
-        
+
     # Run each labeling rule
-    active_rules = [r for r in config['rules'] if config['rules'][r]['enabled']]
+    active_rules = [r for r in config['rules']
+                    if config['rules'][r]['enabled']]
     while True:
 
         ID_FIELD = 'id'
@@ -322,9 +359,11 @@ if __name__ == "__main__":
                 matched = False
 
                 if condition == "all":
-                    matched = all(match_all(patterns[p], get_nested(asset, *p.split('.'))) for p in patterns)
+                    matched = all(match_all(patterns[p], get_nested(
+                        asset, *p.split('.'))) for p in patterns)
                 if condition == "any":
-                    matched = any(match_all(patterns[p], get_nested(asset, *p.split('.'))) for p in patterns)
+                    matched = any(match_all(patterns[p], get_nested(
+                        asset, *p.split('.'))) for p in patterns)
 
                 if matched:
 
@@ -335,24 +374,30 @@ if __name__ == "__main__":
                         label_value = rule_config['labels'][key]
 
                         if not args.report and args.verbose_log:
-                            logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
+                            logging.info(
+                                f"Labeling {asset['name']} with {key}: {label_value}")
 
                         if f"{key}: {label_value}" in labels:
-                            labels[f"{key}: {label_value}"].append(asset[ID_FIELD])
+                            labels[f"{key}: {label_value}"].append(
+                                asset[ID_FIELD])
                         else:
                             labels[f"{key}: {label_value}"] = [asset[ID_FIELD]]
 
                     if 'source_field_labels' in rule_config:
                         for key in rule_config['source_field_labels']:
-                            label_value = get_nested(asset, *rule_config['source_field_labels'][key].split('.'))
+                            label_value = get_nested(
+                                asset, *rule_config['source_field_labels'][key].split('.'))
 
                             if not args.report and args.verbose_log:
-                                logging.info(f"Labeling {asset['name']} with {key}: {label_value}")
-                        
+                                logging.info(
+                                    f"Labeling {asset['name']} with {key}: {label_value}")
+
                             if f"{key}: {label_value}" in labels:
-                                labels[f"{key}: {label_value}"].append(asset[ID_FIELD])
+                                labels[f"{key}: {label_value}"].append(
+                                    asset[ID_FIELD])
                             else:
-                                labels[f"{key}: {label_value}"] = [asset[ID_FIELD]]
+                                labels[f"{key}: {label_value}"] = [
+                                    asset[ID_FIELD]]
 
         # Dedupe the assets in each label
         if args.report:
@@ -365,21 +410,22 @@ if __name__ == "__main__":
                 key_value_pair = l.split(': ')
                 key = key_value_pair[0]
                 value = key_value_pair[1]
-                #vms = labels[l] 
+                #vms = labels[l]
                 vms = list(set(labels[l]))
                 label_queue.put({'key': key, 'value': value, 'vms': vms})
 
             workers = []
             for i in range(0, 5):
-                p = threading.Thread(target=process_label, daemon=True, args=(label_queue, centra))
+                p = threading.Thread(target=process_label,
+                                     daemon=True, args=(label_queue, centra))
                 workers.append(p)
 
             [w.start() for w in workers]
             [w.join() for w in workers]
 
-                #success = centra.create_static_label(key, value, vms)
-                #if success:
-                #    logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
+            #success = centra.create_static_label(key, value, vms)
+            # if success:
+            #    logging.info(f"Labeled {len(vms)} assets with {key}: {value}")
 
         # If this is a single run, break out of the loop
         if not args.service:
@@ -387,4 +433,3 @@ if __name__ == "__main__":
         else:
             logging.info(f"Sleeping for {wait_interval} seconds.")
             sleep(wait_interval)
-        
