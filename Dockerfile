@@ -1,4 +1,4 @@
-FROM python:3
+FROM python:3.10.8-slim-buster
 
 COPY config.yml.sample /config.yml
 COPY gc-regex-labeler.py /
