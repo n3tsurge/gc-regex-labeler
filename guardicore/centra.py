@@ -281,11 +281,29 @@ class CentraAPI(object):
 
             # Page if necessary
             if page <= round(response_data['total_count']/limit)+1:
-                results += self.list_assets(page=response_data['current_page'], limit=limit, *args, **kwargs, )
+                results += self.list_assets(page=response_data['current_page'], limit=limit, *args, **kwargs)
 
             return results
         else:
             return None
+
+    def deactivate_assets(self, component_ids: list[str]):
+        """
+        Deactives a number of assets
+        """
+
+        api_endpoint = "/api/v3.0/assets/deactivate"
+        
+        data = {
+            "component_ids": ",".join(component_ids)
+        }
+
+        response = self.session.post(f"{self.base_url}{api_endpoint}", data=json.dumps(data))
+        if response.status_code == 200:
+            return True
+        else:
+            print(response.text)
+            return False
 
     def create_static_label(self, key, value, vms):
         """

@@ -4,6 +4,7 @@ import logging
 import re
 import smtplib
 import threading
+import datetime
 from argparse import ArgumentParser
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -147,6 +148,13 @@ if __name__ == "__main__":
     parser.add_argument(
         '--email-from', help="From addresss for sending email reports")
     parser.add_argument('--smtp-server', help="The SMTP server to use")
+    parser.add_argument('--check-duplicate-ips',
+                        help="Returns a JSON doc that highlights IP overlap", action="store_true")
+    parser.add_argument('--deactivate-old-assets',
+                        help="Will indicate to the tool that it should deactivate old assets in the conosle", action="store_true")
+    parser.add_argument(
+        '--asset-age', help="How long (in days) should the asset be offline to be deactivated using the --deactivate-old-assets flag", default=30)
+    parser.add_argument('--preview-deactivate', help="Will print out which assets will be deactivated and how many", action="store_true")
     parser.add_argument(
         '--ignore-tls', help="Ignores TLS issues when calling the API")
     args = parser.parse_args()
@@ -193,7 +201,8 @@ if __name__ == "__main__":
         exit(0)
 
     if args.csv_missing_only:
-        logging.warning("Resulting CSV will only contain assets missing label values due to --csv-missing-only")
+        logging.warning(
+            "Resulting CSV will only contain assets missing label values due to --csv-missing-only")
 
     # Authenticate to Guardicore
     logging.info("Authenticating to Guardicore")
@@ -211,6 +220,71 @@ if __name__ == "__main__":
         wait_interval = int(config['global']['wait_interval'])
     else:
         wait_interval = args.wait_interval
+
+    if args.deactivate_old_assets:
+        assets_to_deactivate = []
+        component_ids = []
+        logging.info("Fetching all assets from Guardicore Centra")
+        if args.skip_deleted:
+            logging.info("Skipping assets that are off/deleted")
+            assets = centra.list_assets(limit=1000, status="on")
+        else:
+            assets = centra.list_assets(limit=1000)
+        for asset in assets:
+            last_seen = asset['last_seen']
+            now = datetime.datetime.utcnow()
+            last_seen = datetime.datetime.fromtimestamp(last_seen/1000)
+            delta = now - last_seen
+            if delta.days > args.asset_age:
+                assets_to_deactivate.append(asset['name'])
+                component_ids.append(asset['id'])
+                if args.preview_deactivate:
+                    logging.info(f"{asset['name']} will be deleted for being offline for more than {args.asset_age} days - Last Seen: {last_seen.isoformat()}")
+            
+        if args.preview_deactivate:
+            logging.info(f"Would deactivate {len(assets_to_deactivate)} assets")
+
+        proceed = input(f"Deactivate {len(component_ids)} assets? [Y|n] ")
+        print(proceed)
+        if proceed in ["","Y","Yes",'y']:
+            logging.info(f"Deactivating {len(component_ids)} assets.")
+            success = centra.deactivate_assets(component_ids=component_ids)
+            if success:
+                logging.info("Successfully deactivated assets")
+            else:
+                logging.warning("An error occurred while deactivating assets")
+        exit(1)
+
+    if args.check_duplicate_ips:
+        logging.info("Fetching all assets from Guardicore Centra")
+        if args.skip_deleted:
+            logging.info("Skipping assets that are off/deleted")
+            assets = centra.list_assets(limit=1000, status="on")
+        else:
+            assets = centra.list_assets(limit=1000)
+        ips = {}
+        for asset in assets:
+            if "guest_agent_details" in asset:
+                gad = asset["guest_agent_details"]
+                if "network" in gad:
+                    for _, interface in enumerate(gad["network"]):
+                        for _, ip in enumerate(interface["ip_addresses"]):
+                            address = ip["address"]
+                            if address not in ips:
+                                ips[address] = [gad["hostname"]]
+                            else:
+
+                                if gad['hostname'] not in ips[address]:
+                                    ips[address].append(gad["hostname"])
+        if args.report:
+            for ip in ips:
+                if len(ips[ip]) > 1:
+                    print(f"{ip} - {len(ips[ip])} - {','.join(ips[ip])}")
+        else:
+            logging.info("Saving information to duplicate-ip-report.json")
+            with open('duplicate-ip-report.json', 'w') as f:
+                json.dump(ips, f)
+        exit()
 
     if args.check_dupes:
         logging.info("Fetching all assets from Guardicore Centra")
