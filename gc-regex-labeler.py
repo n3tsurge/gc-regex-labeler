@@ -153,7 +153,7 @@ if __name__ == "__main__":
     parser.add_argument('--deactivate-old-assets',
                         help="Will indicate to the tool that it should deactivate old assets in the conosle", action="store_true")
     parser.add_argument(
-        '--asset-age', help="How long (in days) should the asset be offline to be deactivated using the --deactivate-old-assets flag", default=30)
+        '--asset-age', help="How long (in days) should the asset be offline to be deactivated using the --deactivate-old-assets flag", default=30, type=int)
     parser.add_argument('--preview-deactivate', help="Will print out which assets will be deactivated and how many", action="store_true")
     parser.add_argument(
         '--ignore-tls', help="Ignores TLS issues when calling the API")
